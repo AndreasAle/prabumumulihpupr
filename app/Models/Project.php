@@ -1,0 +1,15 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
+
+class Project extends Model
+{
+    use SoftDeletes;
+
+    protected $guarded = [];
+
+    protected $casts = ['published_at' => 'datetime', 'start_date' => 'date', 'end_date' => 'date', 'is_featured' => 'boolean', 'is_published' => 'boolean'];
+}

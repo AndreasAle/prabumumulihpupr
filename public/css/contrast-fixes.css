@@ -1,0 +1,18 @@
+/* Final contrast guard for every dark homepage section */
+.numbers .section-heading h2,
+.agenda-section .section-heading h2,
+.numbers h2,
+.agenda-section h2{color:#fff!important;text-shadow:0 2px 18px rgba(0,0,0,.32)!important}
+.numbers .section-heading .kicker,
+.agenda-section .section-heading .kicker,
+.numbers .kicker,
+.agenda-section .kicker{color:#fccc01!important;text-shadow:none!important}
+.numbers .section-heading p{color:#c8d5e1!important}
+.numbers .section-heading h2,
+.agenda-section .section-heading h2{color:#fff!important;-webkit-text-fill-color:#fff!important;opacity:1!important;filter:none!important}
+.numbers .section-heading>p{color:#e2ebf3!important;-webkit-text-fill-color:#e2ebf3!important;opacity:1!important;filter:none!important}
+.numbers .section-heading .kicker,
+.agenda-section .section-heading .kicker{color:#fccc01!important;-webkit-text-fill-color:#fccc01!important;opacity:1!important}
+.agenda-list h3,.agenda-list>div>b{color:#fff!important}
+.agenda-list>div>span,.agenda-list time span{color:#c5d2de!important}
+@media(max-width:760px){.numbers .section-heading h2,.agenda-section .section-heading h2{font-size:36px!important;line-height:1.12!important}}
