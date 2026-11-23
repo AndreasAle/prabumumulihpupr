@@ -20,6 +20,8 @@ Route::prefix('admin')->middleware('auth')->group(function () {
     Route::get('/', [AdminController::class, 'dashboard']);
     Route::match(['get', 'post'], '/settings', [AdminController::class, 'settings']);
     Route::get('/complaints-export', [AdminController::class, 'exportComplaints']);
+    Route::get('/complaints/{id}/attachment', [AdminController::class, 'complaintAttachment'])
+        ->whereNumber('id')->name('admin.complaints.attachment');
     Route::get('/export/{module}', [AdminController::class, 'export']);
     Route::post('/backup', [AdminController::class, 'backup']);
     Route::get('/preview/{module}/{id}', [AdminController::class, 'preview']);

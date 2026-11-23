@@ -6,6 +6,8 @@ use App\Models\AiKnowledgeSource;
 use App\Models\Complaint;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class PortalTest extends TestCase
@@ -20,9 +22,18 @@ class PortalTest extends TestCase
 
     public function test_public_complaint_submission_returns_ticket(): void
     {
-        $this->post('/pengaduan', ['name' => 'Warga Uji', 'phone' => '08123456789', 'category' => 'Drainase', 'location' => 'Jalan Contoh', 'description' => 'Saluran drainase perlu diperiksa karena terjadi genangan.'])->assertSessionHas('ticket');
+        Storage::fake('public');
+        $file = UploadedFile::fake()->create('laporan.pdf', 100, 'application/pdf');
+        $this->post('/pengaduan', ['name' => 'Warga Uji', 'phone' => '08123456789', 'category' => 'Drainase', 'location' => 'Jalan Contoh', 'description' => 'Saluran drainase perlu diperiksa karena terjadi genangan.', 'attachment' => $file])->assertSessionHas('ticket');
         $this->assertDatabaseCount('complaints', 1);
         $this->assertSame('NEW', Complaint::first()->status);
+        Storage::disk('public')->assertExists(Complaint::first()->attachment);
+
+        $admin = User::factory()->create(['role' => 'SUPER_ADMIN']);
+        $this->actingAs($admin)->get('/admin/complaints/'.Complaint::first()->id.'/edit')
+            ->assertOk()->assertSee('Buka lampiran');
+        $this->actingAs($admin)->get('/admin/complaints/'.Complaint::first()->id.'/attachment')
+            ->assertOk()->assertHeader('content-type', 'application/pdf');
     }
 
     public function test_admin_is_protected_and_can_login(): void
@@ -47,6 +58,35 @@ class PortalTest extends TestCase
         $this->actingAs($user)->get('/admin/documents')->assertForbidden();
     }
 
+    public function test_admin_modules_and_role_navigation_render_without_errors(): void
+    {
+        $this->seed();
+        $admin = User::factory()->create(['role' => 'SUPER_ADMIN']);
+
+        foreach (['news','pages','services','projects','documents','agendas','statistics','media','complaints','users','knowledge','audits'] as $module) {
+            $this->actingAs($admin)->get('/admin/'.$module)->assertOk();
+        }
+        foreach (['news','pages','services','projects','documents','agendas','statistics','media','users','knowledge'] as $module) {
+            $this->actingAs($admin)->get('/admin/'.$module.'/create')->assertOk();
+        }
+        $this->actingAs($admin)->get('/admin/settings')->assertOk();
+
+        $contentEditor = User::factory()->create(['role' => 'CONTENT_EDITOR']);
+        $this->actingAs($contentEditor)->get('/admin')
+            ->assertOk()
+            ->assertSee('/admin/pages', false)
+            ->assertSee('/admin/agendas', false)
+            ->assertDontSee('/admin/documents', false)
+            ->assertDontSee('/admin/complaints', false);
+
+        $transparencyEditor = User::factory()->create(['role' => 'TRANSPARENCY_EDITOR']);
+        $this->actingAs($transparencyEditor)->get('/admin')
+            ->assertOk()
+            ->assertSee('/admin/pages', false)
+            ->assertSee('/admin/documents', false)
+            ->assertDontSee('/admin/news', false);
+    }
+
     public function test_redesigned_public_pages_render(): void
     {
         $this->seed();
@@ -56,6 +96,22 @@ class PortalTest extends TestCase
         }
 
         $this->get('/berita')->assertSee('Rangkaian Kegiatan Dinas PUPR');
+        $this->get('/struktur-organisasi')
+            ->assertSee('Bidang Pertanahan')
+            ->assertSee('Kasubag Umum dan Tata Usaha')
+            ->assertSee('Teknik Penyehatan Lingkungan Ahli Muda')
+            ->assertSee('Penelaah Teknis Kebijakan')
+            ->assertSee('Lihat bagan resmi');
+        $this->get('/transparansi/struktur-organisasi-pupr-prabumulih-2025-2029')
+            ->assertOk()
+            ->assertSee('Struktur Organisasi Dinas PUPR Kota Prabumulih');
+        $this->get('/layanan/persetujuan-kkpr')
+            ->assertOk()
+            ->assertSee('ALUR PELAYANAN PKKPR')
+            ->assertSee('Penerbitan PKKPR')
+            ->assertSee('alur-pengajuan-pkppr.mp4');
+        $this->get('/galeri')
+            ->assertSee('Peningkatan Pelayanan Pemanfaatan Ruang Wilayah Kota Prabumulih');
     }
 
     public function test_search_renders_empty_results_and_matching_content(): void

@@ -85,7 +85,8 @@ class PublicController extends Controller
 
         $detailMedia = match ($type) {
             'berita' => MediaAsset::where('source_url', 'article:'.$item->slug)->orderBy('file_path')->get(),
-            'layanan' => MediaAsset::where('source_url', 'service:'.$item->slug)->orderBy('file_path')->get(),
+            'layanan' => MediaAsset::where('source_url', 'service:'.$item->slug)
+                ->where('mime_type', 'like', 'video/%')->orderBy('file_path')->get(),
             default => collect(),
         };
 
@@ -107,6 +108,7 @@ class PublicController extends Controller
         $legacyPages = collect();
         $videoData = collect();
         $officialMedia = collect();
+        $officialDocument = null;
         if ($slug === 'profil') {
             $legacyPages = Page::whereIn('slug', [
                 'home-3', 'visimisi', 'tugasfungsi', 'contact-3', 'capaiankinerja',
@@ -118,9 +120,12 @@ class PublicController extends Controller
                 ->where('file_path', 'like', 'materi-resmi/%')
                 ->where('source_url', 'like', 'article:%')
                 ->orderBy('category')->orderBy('file_path')->get()->groupBy('category');
+        } elseif ($slug === 'struktur-organisasi') {
+            $officialDocument = Document::where('slug', 'struktur-organisasi-pupr-prabumulih-2025-2029')
+                ->where('is_public', true)->first();
         }
 
-        return view('public.page', compact('slug', 'pageData', 'legacyPages', 'videoData', 'officialMedia'));
+        return view('public.page', compact('slug', 'pageData', 'legacyPages', 'videoData', 'officialMedia', 'officialDocument'));
     }
 
     public function legacyPage(string $slug)

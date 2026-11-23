@@ -34,14 +34,18 @@ class AdminController extends Controller
 
     public function dashboard()
     {
+        $counts = [
+            'Berita terbit' => News::where('status', 'PUBLISHED')->count(),
+            'Halaman publik' => Page::where('status', 'PUBLISHED')->count(),
+            'Media tersimpan' => MediaAsset::count(),
+            'Agenda aktif' => Agenda::where('status', 'PUBLISHED')->count(),
+        ];
+        if (in_array(request()->user()->role, ['SUPER_ADMIN', 'ADMIN', 'COMPLAINT_OFFICER'], true)) {
+            $counts['Pengaduan baru'] = Complaint::where('status', 'NEW')->count();
+        }
+
         return view('admin.dashboard', [
-            'counts' => [
-                'Berita terbit' => News::where('status', 'PUBLISHED')->count(),
-                'Halaman publik' => Page::where('status', 'PUBLISHED')->count(),
-                'Media tersimpan' => MediaAsset::count(),
-                'Agenda aktif' => Agenda::where('status', 'PUBLISHED')->count(),
-                'Pengaduan baru' => Complaint::where('status', 'NEW')->count(),
-            ],
+            'counts' => $counts,
             'complaints' => Complaint::latest()->take(6)->get(),
             'recentAudits' => AuditLog::with('user')->latest()->take(6)->get(),
             'storageSize' => MediaAsset::sum('file_size'),
@@ -126,7 +130,7 @@ class AdminController extends Controller
         $this->authorizeModule($module);
         abort_if(in_array($module, ['complaints', 'audits'], true), 403);
         $item = $this->model($module)::findOrFail($id);
-        if ($module === 'media' && Storage::disk('public')->exists($item->file_path)) {
+        if (in_array($module, ['media', 'documents'], true) && $item->file_path && Storage::disk('public')->exists($item->file_path)) {
             Storage::disk('public')->delete($item->file_path);
         }
         $this->audit('DELETE', $module, $item, 'Menghapus data.', $item->toArray());
@@ -170,6 +174,24 @@ class AdminController extends Controller
         }, $filename, ['Content-Type' => 'text/csv']);
     }
 
+    public function complaintAttachment(int $id)
+    {
+        $this->authorizeModule('complaints');
+        $complaint = Complaint::findOrFail($id);
+        abort_if(blank($complaint->attachment), 404, 'Pengaduan ini tidak memiliki lampiran.');
+        abort_unless(Storage::disk('public')->exists($complaint->attachment), 404, 'File lampiran tidak ditemukan.');
+
+        $extension = pathinfo($complaint->attachment, PATHINFO_EXTENSION);
+        $filename = 'lampiran-'.$complaint->ticket_number.($extension ? '.'.$extension : '');
+
+        return Storage::disk('public')->response(
+            $complaint->attachment,
+            $filename,
+            ['Content-Type' => Storage::disk('public')->mimeType($complaint->attachment)],
+            'inline'
+        );
+    }
+
     public function export(string $module)
     {
         $this->authorizeModule($module);
@@ -207,7 +229,10 @@ class AdminController extends Controller
         $item = $this->model($module)::findOrFail($id);
         $type = ['news' => 'berita', 'services' => 'layanan', 'projects' => 'proyek', 'documents' => 'transparansi'][$module] ?? null;
         if ($type) {
-            return view('public.detail', ['type' => $type, 'item' => $item, 'related' => collect()]);
+            $detailMedia = $module === 'services'
+                ? MediaAsset::where('source_url', 'service:'.$item->slug)->where('mime_type', 'like', 'video/%')->get()
+                : collect();
+            return view('public.detail', ['type' => $type, 'item' => $item, 'related' => collect(), 'detailMedia' => $detailMedia]);
         }
         if ($module === 'pages') {
             return view('public.legacy-page', ['page' => $item]);
@@ -292,6 +317,12 @@ class AdminController extends Controller
 
     private function prepareData(string $module, array $data, mixed $item): array
     {
+        if ($module === 'services') {
+            foreach (['requirements', 'steps'] as $listField) {
+                $lines = preg_split('/\R+/u', trim((string) ($data[$listField] ?? ''))) ?: [];
+                $data[$listField] = array_values(array_filter(array_map('trim', $lines)));
+            }
+        }
         foreach (['content', 'description'] as $richField) {
             if (isset($data[$richField])) {
                 $data[$richField] = $this->sanitizeRichHtml((string) $data[$richField]);
@@ -312,6 +343,9 @@ class AdminController extends Controller
                     $this->compressImage(Storage::disk('public')->path($path), (string) $file->getMimeType());
                     $data[$column] = Storage::disk('public')->url($path);
                 } else {
+                    if ($item?->file_path && Storage::disk('public')->exists($item->file_path)) {
+                        Storage::disk('public')->delete($item->file_path);
+                    }
                     $data[$column] = $path;
                     $data['file_type'] = strtoupper($file->getClientOriginalExtension());
                     $data['file_size'] = $this->humanFileSize(Storage::disk('public')->size($path));
@@ -360,7 +394,7 @@ class AdminController extends Controller
         return match ($m) {
             'news' => $r->validate([...$seo, 'title' => 'required|max:200', 'category' => 'required|max:100', 'excerpt' => 'nullable|max:500', 'content' => 'required', 'thumbnail' => 'nullable|max:500', 'thumbnail_file' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:10240', 'author' => 'required|max:120', 'status' => 'required|in:DRAFT,REVIEW,SCHEDULED,PUBLISHED,ARCHIVED', 'published_at' => 'nullable|date']),
             'pages' => $r->validate([...$seo, 'title' => 'required|max:200', 'content' => 'required', 'excerpt' => 'nullable|max:500', 'featured_image' => 'nullable|max:500', 'featured_image_file' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:10240', 'status' => 'required|in:DRAFT,REVIEW,SCHEDULED,PUBLISHED,ARCHIVED', 'published_at' => 'nullable|date']),
-            'services' => $r->validate([...$seo, 'name' => 'required|max:200', 'category' => 'required|max:100', 'summary' => 'required|max:500', 'description' => 'nullable', 'processing_time' => 'nullable|max:200', 'cost_information' => 'nullable|max:200', 'officer_contact' => 'nullable|max:200', 'online_url' => 'nullable|url', 'publish_status' => 'required|in:DRAFT,REVIEW,SCHEDULED,PUBLISHED,ARCHIVED', 'sort_order' => 'nullable|integer']),
+            'services' => $r->validate([...$seo, 'name' => 'required|max:200', 'category' => 'required|max:100', 'summary' => 'required|max:500', 'description' => 'nullable', 'requirements' => 'nullable|string|max:10000', 'steps' => 'nullable|string|max:10000', 'processing_time' => 'nullable|max:200', 'cost_information' => 'nullable|max:200', 'officer_contact' => 'nullable|max:200', 'online_url' => 'nullable|url', 'publish_status' => 'required|in:DRAFT,REVIEW,SCHEDULED,PUBLISHED,ARCHIVED', 'sort_order' => 'nullable|integer']),
             'projects' => $r->validate([...$seo, 'title' => 'required|max:200', 'category' => 'required|max:100', 'location' => 'required|max:250', 'district' => 'nullable|max:150', 'year' => 'required|digits:4', 'description' => 'required', 'progress_percentage' => 'required|integer|min:0|max:100', 'status' => 'required|in:PLANNED,ONGOING,COMPLETED,DELAYED', 'featured_image' => 'nullable|max:500', 'featured_image_file' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:10240', 'is_featured' => 'nullable|boolean', 'publish_status' => 'required|in:DRAFT,REVIEW,SCHEDULED,PUBLISHED,ARCHIVED']),
             'documents' => $r->validate([...$seo, 'title' => 'required|max:200', 'category' => 'required|max:100', 'year' => 'required|digits:4', 'description' => 'nullable', 'external_url' => 'nullable|url', 'document_file' => 'nullable|file|mimes:pdf,doc,docx,xls,xlsx,ppt,pptx|max:51200', 'file_type' => 'nullable|max:30', 'file_size' => 'nullable|max:30', 'publish_status' => 'required|in:DRAFT,REVIEW,SCHEDULED,PUBLISHED,ARCHIVED', 'published_at' => 'nullable|date']),
             'agendas' => $r->validate([...$seo, 'title' => 'required|max:200', 'description' => 'nullable', 'start_datetime' => 'required|date', 'end_datetime' => 'nullable|date|after_or_equal:start_datetime', 'location' => 'required|max:250', 'publish_status' => 'required|in:DRAFT,REVIEW,SCHEDULED,PUBLISHED,ARCHIVED']),
