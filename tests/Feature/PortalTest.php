@@ -143,6 +143,10 @@ class PortalTest extends TestCase
         $this->get('/berita')->assertSee('Rangkaian Kegiatan Dinas PUPR');
         $this->get('/struktur-organisasi')
             ->assertSee('Bidang Pertanahan')
+            ->assertSee('gedung-pemkot-prabumulih.webp')
+            ->assertSee('fly-over-patih-galung.webp')
+            ->assertSee('Gedung Pemerintah Kota Prabumulih')
+            ->assertSee('Fly Over Patih Galung')
             ->assertSee('Kasubag Umum dan Tata Usaha')
             ->assertSee('Teknik Penyehatan Lingkungan Ahli Muda')
             ->assertSee('Penelaah Teknis Kebijakan')

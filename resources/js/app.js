@@ -45,3 +45,28 @@ if(cmsForm){
   draftNotice.querySelector('[data-clear-draft]').addEventListener('click',()=>{localStorage.removeItem(draftKey);draftNotice.querySelector('[data-restore-draft]').hidden=true;draftNotice.querySelector('[data-draft-state]').textContent='Draft lokal dibersihkan'});
   cmsForm.addEventListener('submit',()=>{richFields.forEach(textarea=>{const editor=textarea.previousElementSibling?.querySelector('.rich-content');if(editor)textarea.value=editor.innerHTML});localStorage.removeItem(draftKey)});
 }
+
+// Organization hero: two-image showcase requested by the client.
+const orgSlider=document.querySelector('[data-org-slider]');
+if(orgSlider){
+  const slides=[...orgSlider.querySelectorAll('.org-hero-slide')];
+  const dots=[...orgSlider.querySelectorAll('[data-org-dot]')];
+  const caption=orgSlider.querySelector('.org-slider-caption');
+  const labels=['Gedung Pemerintah Kota Prabumulih','Fly Over Patih Galung'];
+  let current=0;
+  let timer;
+  const show=index=>{
+    current=(index+slides.length)%slides.length;
+    slides.forEach((slide,i)=>slide.classList.toggle('active',i===current));
+    dots.forEach((dot,i)=>{dot.classList.toggle('active',i===current);dot.setAttribute('aria-current',i===current?'true':'false')});
+    if(caption)caption.innerHTML=`<small>${String(current+1).padStart(2,'0')} / ${String(slides.length).padStart(2,'0')}</small><strong>${labels[current]}</strong>`;
+  };
+  const play=()=>{clearInterval(timer);if(!window.matchMedia('(prefers-reduced-motion: reduce)').matches)timer=setInterval(()=>show(current+1),6000)};
+  orgSlider.querySelector('[data-org-prev]')?.addEventListener('click',()=>{show(current-1);play()});
+  orgSlider.querySelector('[data-org-next]')?.addEventListener('click',()=>{show(current+1);play()});
+  dots.forEach(dot=>dot.addEventListener('click',()=>{show(Number(dot.dataset.orgDot));play()}));
+  orgSlider.addEventListener('mouseenter',()=>clearInterval(timer));
+  orgSlider.addEventListener('mouseleave',play);
+  document.addEventListener('visibilitychange',()=>document.hidden?clearInterval(timer):play());
+  show(0);play();
+}
