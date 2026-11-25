@@ -8,10 +8,9 @@
     <link rel="icon" href="{{asset('images/brand/logo-pupr.png')}}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
-    @vite(['resources/css/app.css','resources/js/app.js'])
-    <link rel="stylesheet" href="{{asset('css/app-production.css')}}?v=20261125-2">
-    <script type="module" src="{{asset('js/app-production.js')}}?v=20261125-2"></script>
-    <link rel="stylesheet" href="/css/admin-production.css?v=20261123">
+    <link rel="stylesheet" href="{{asset('css/app-production.css')}}?v=20261125-3">
+    <script type="module" src="{{asset('js/app-production.js')}}?v=20261125-3"></script>
+    <link rel="stylesheet" href="/css/admin-production.css?v=20261125-3">
 </head>
 @php
     $role = auth()->user()->role;

@@ -1,4 +1,6 @@
 import './bootstrap';
+if(!window.__puprPortalAppLoaded){
+window.__puprPortalAppLoaded=true;
 const header=document.querySelector('.site-header');document.querySelector('.menu-btn')?.addEventListener('click',e=>{header?.classList.toggle('open');e.currentTarget.setAttribute('aria-expanded',header?.classList.contains('open')?'true':'false')});
 const chat=document.querySelector('.chat-panel');let history=[];document.querySelector('.chat-launch')?.addEventListener('click',()=>{chat?.classList.add('open');document.querySelector('.chat-form input')?.focus()});document.querySelectorAll('.open-assistant').forEach(b=>b.addEventListener('click',()=>chat?.classList.add('open')));document.querySelector('.chat-close')?.addEventListener('click',()=>chat?.classList.remove('open'));
 document.querySelector('.chat-body')?.addEventListener('click',e=>{const b=e.target.closest('[data-chat-suggestion],.quick button');if(b)sendChat(b.dataset.chatSuggestion||b.textContent)});document.querySelector('.chat-form')?.addEventListener('submit',e=>{e.preventDefault();const i=e.currentTarget.querySelector('input');if(i.value.trim())sendChat(i.value.trim());i.value=''});
@@ -69,4 +71,5 @@ if(orgSlider){
   orgSlider.addEventListener('mouseleave',play);
   document.addEventListener('visibilitychange',()=>document.hidden?clearInterval(timer):play());
   show(0);play();
+}
 }
