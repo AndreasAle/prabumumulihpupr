@@ -61,6 +61,7 @@
     <header class="admin-top"><button class="admin-menu" type="button" aria-label="Buka menu" aria-expanded="false">☰</button><div><small>DINAS PUPR KOTA PRABUMULIH</small><b>@yield('header','Dashboard')</b></div><span class="production-pill">CMS AKTIF</span></header>
     <main>
         @if(session('success'))<div class="flash" role="status">✓ {{session('success')}}</div>@endif
+        @if(session('warning'))<div class="flash flash-warning" role="alert">{{session('warning')}}</div>@endif
         @if($errors->any())<div class="form-errors admin-global-errors" role="alert"><b>Data belum dapat diproses.</b><ul>@foreach($errors->all() as $error)<li>{{$error}}</li>@endforeach</ul></div>@endif
         @yield('content')
     </main>

@@ -36,6 +36,51 @@ class PortalTest extends TestCase
             ->assertOk()->assertHeader('content-type', 'application/pdf');
     }
 
+    public function test_reporter_can_track_complaint_without_exposing_personal_data(): void
+    {
+        $complaint = Complaint::create([
+            'ticket_number' => 'PUPR-261125-ABCDE', 'name' => 'Nama Rahasia',
+            'email' => 'rahasia@example.com', 'phone' => '081234567890',
+            'category' => 'Drainase', 'location' => 'Jalan Contoh',
+            'description' => 'Saluran air perlu segera diperiksa oleh petugas.',
+            'status' => 'IN_PROCESS', 'public_response' => 'Petugas sedang melakukan pemeriksaan lapangan.',
+        ]);
+
+        $this->post('/pengaduan/lacak', ['ticket_number' => strtolower($complaint->ticket_number)])
+            ->assertRedirect('/pengaduan')
+            ->assertSessionHas('trackedComplaint');
+
+        $this->followingRedirects()->post('/pengaduan/lacak', ['ticket_number' => $complaint->ticket_number])
+            ->assertOk()
+            ->assertSee($complaint->ticket_number)
+            ->assertSee('Sedang ditindaklanjuti')
+            ->assertSee('Petugas sedang melakukan pemeriksaan lapangan.')
+            ->assertDontSee('rahasia@example.com')
+            ->assertDontSee('081234567890');
+
+        $this->post('/pengaduan/lacak', ['ticket_number' => 'PUPR-261125-ZZZZZ'])
+            ->assertSessionHas('trackingError');
+    }
+
+    public function test_admin_can_filter_sort_and_print_complaints(): void
+    {
+        $admin = User::factory()->create(['role' => 'SUPER_ADMIN']);
+        $drainage = Complaint::create([
+            'ticket_number' => 'PUPR-261125-DRAIN', 'name' => 'Pelapor Drainase', 'phone' => '0811',
+            'category' => 'Drainase', 'location' => 'Lokasi A', 'description' => 'Laporan drainase untuk pengujian sistem.', 'status' => 'NEW',
+        ]);
+        Complaint::create([
+            'ticket_number' => 'PUPR-261125-JALAN', 'name' => 'Pelapor Jalan', 'phone' => '0822',
+            'category' => 'Jalan & Jembatan', 'location' => 'Lokasi B', 'description' => 'Laporan jalan untuk pengujian sistem.', 'status' => 'RESOLVED',
+        ]);
+
+        $this->actingAs($admin)->get('/admin/complaints?status=NEW&category=Drainase&sort=category&direction=asc')
+            ->assertOk()->assertSee('PUPR-261125-DRAIN')->assertDontSee('PUPR-261125-JALAN')->assertSee('Cetak A4');
+
+        $this->actingAs($admin)->get('/admin/complaints/'.$drainage->id.'/print')
+            ->assertOk()->assertSee('FORMULIR PENGADUAN MASYARAKAT')->assertSee('Cetak / Simpan PDF');
+    }
+
     public function test_admin_is_protected_and_can_login(): void
     {
         $this->get('/admin')->assertRedirect('/admin/login');
@@ -112,6 +157,7 @@ class PortalTest extends TestCase
             ->assertSee('alur-pengajuan-pkppr.mp4');
         $this->get('/galeri')
             ->assertSee('Peningkatan Pelayanan Pemanfaatan Ruang Wilayah Kota Prabumulih');
+        $this->get('/pengaduan')->assertSee('https://lapor.go.id', false)->assertSee('LACAK PENGADUAN');
     }
 
     public function test_search_renders_empty_results_and_matching_content(): void

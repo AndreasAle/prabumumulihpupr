@@ -12,6 +12,8 @@ Route::get('/arsip', [PublicController::class, 'archive'])->name('archive');
 Route::get('/halaman/{slug}', [PublicController::class, 'legacyPage'])->name('legacy.page');
 Route::get('/pengaduan', [PublicController::class, 'complaint'])->name('complaint');
 Route::post('/pengaduan', [PublicController::class, 'storeComplaint'])->middleware('throttle:5,10');
+Route::post('/pengaduan/lacak', [PublicController::class, 'trackComplaint'])
+    ->middleware('throttle:10,10')->name('complaint.track');
 Route::post('/asisten', [AIChatController::class, '__invoke'])->middleware('throttle:20,1');
 Route::get('/admin/login', [AuthController::class, 'login'])->name('login');
 Route::post('/admin/login', [AuthController::class, 'authenticate'])->middleware('throttle:5,1');
@@ -22,6 +24,8 @@ Route::prefix('admin')->middleware('auth')->group(function () {
     Route::get('/complaints-export', [AdminController::class, 'exportComplaints']);
     Route::get('/complaints/{id}/attachment', [AdminController::class, 'complaintAttachment'])
         ->whereNumber('id')->name('admin.complaints.attachment');
+    Route::get('/complaints/{id}/print', [AdminController::class, 'printComplaint'])
+        ->whereNumber('id')->name('admin.complaints.print');
     Route::get('/export/{module}', [AdminController::class, 'export']);
     Route::post('/backup', [AdminController::class, 'backup']);
     Route::get('/preview/{module}/{id}', [AdminController::class, 'preview']);

@@ -160,6 +160,22 @@ class PublicController extends Controller
         return back()->with('ticket', $complaint->ticket_number);
     }
 
+    public function trackComplaint(Request $request)
+    {
+        $data = $request->validate([
+            'ticket_number' => ['required', 'string', 'max:30', 'regex:/^PUPR-[A-Z0-9-]+$/i'],
+        ], [
+            'ticket_number.regex' => 'Format nomor tiket tidak sesuai.',
+        ]);
+
+        $ticket = strtoupper(trim($data['ticket_number']));
+        $complaint = Complaint::where('ticket_number', $ticket)->first();
+
+        return redirect()->route('complaint')
+            ->withInput(['ticket_number' => $ticket])
+            ->with($complaint ? ['trackedComplaint' => $complaint] : ['trackingError' => 'Nomor tiket tidak ditemukan. Periksa kembali nomor yang Anda masukkan.']);
+    }
+
     public function search(Request $request)
     {
         $q = trim((string) $request->query('q', ''));

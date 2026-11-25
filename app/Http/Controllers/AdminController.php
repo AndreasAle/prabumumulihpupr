@@ -18,6 +18,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use ZipArchive;
@@ -70,7 +71,31 @@ class AdminController extends Controller
             $query->where($field, 'like', "%{$q}%");
         }
 
-        return view('admin.index', ['module' => $module, 'items' => $query->latest()->paginate(20)->withQueryString()]);
+        $sortColumn = 'created_at';
+        $sortDirection = 'desc';
+        if ($module === 'complaints') {
+            if ($status = trim((string) $request->query('status', ''))) {
+                $query->where('status', $status);
+            }
+            if ($category = trim((string) $request->query('category', ''))) {
+                $query->where('category', $category);
+            }
+            if ($dateFrom = $request->query('date_from')) {
+                $query->whereDate('created_at', '>=', $dateFrom);
+            }
+            if ($dateTo = $request->query('date_to')) {
+                $query->whereDate('created_at', '<=', $dateTo);
+            }
+            $sortColumn = in_array($request->query('sort'), ['created_at', 'updated_at', 'status', 'category'], true)
+                ? $request->query('sort') : 'created_at';
+            $sortDirection = $request->query('direction') === 'asc' ? 'asc' : 'desc';
+        }
+
+        return view('admin.index', [
+            'module' => $module,
+            'items' => $query->orderBy($sortColumn, $sortDirection)->paginate(20)->withQueryString(),
+            'complaintCategories' => $module === 'complaints' ? Complaint::query()->whereNotNull('category')->distinct()->orderBy('category')->pluck('category') : collect(),
+        ]);
     }
 
     public function create(string $module)
@@ -118,8 +143,20 @@ class AdminController extends Controller
         $this->audit('UPDATE', $module, $item, 'Memperbarui data.', ['before' => $before, 'after' => $data]);
 
         if ($module === 'complaints' && $item->email && $request->boolean('notify_reporter')) {
-            Mail::raw("Status laporan {$item->ticket_number}: {$item->status}\n\n{$item->public_response}", fn ($mail) => $mail->to($item->email)->subject('Pembaruan Pengaduan Dinas PUPR'));
-            $item->update(['notified_at' => now()]);
+            try {
+                Mail::raw("Status laporan {$item->ticket_number}: {$item->status}\n\n{$item->public_response}", fn ($mail) => $mail->to($item->email)->subject('Pembaruan Pengaduan Dinas PUPR'));
+                $item->update(['notified_at' => now()]);
+            } catch (\Throwable $exception) {
+                Log::error('Pengiriman email pembaruan pengaduan gagal.', [
+                    'complaint_id' => $item->id,
+                    'ticket_number' => $item->ticket_number,
+                    'error' => $exception->getMessage(),
+                ]);
+
+                return redirect("/admin/{$module}")
+                    ->with('success', 'Perubahan berhasil disimpan.')
+                    ->with('warning', 'Email kepada pelapor belum berhasil dikirim. Silakan periksa konfigurasi email dan coba kembali.');
+            }
         }
 
         return redirect("/admin/{$module}")->with('success', 'Perubahan berhasil disimpan.');
@@ -190,6 +227,13 @@ class AdminController extends Controller
             ['Content-Type' => Storage::disk('public')->mimeType($complaint->attachment)],
             'inline'
         );
+    }
+
+    public function printComplaint(int $id)
+    {
+        $this->authorizeModule('complaints');
+
+        return view('admin.complaint-print', ['complaint' => Complaint::findOrFail($id)]);
     }
 
     public function export(string $module)
